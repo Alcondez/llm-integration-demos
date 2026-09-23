@@ -5,7 +5,7 @@
 
 import { client, MODEL } from "../shared/client.js";
 
-const N = 3;
+const N = 30;
 
 const task = `You may use any listed flights. Build one itinerary from GRU to the Vancouver meeting. Offsets only, no daylight-saving: GRU UTC-3, LIS UTC+0, JFK UTC-5, BOS UTC-5, SEA UTC-8, YVR UTC-8. An arrival clock earlier than that leg's departure clock is the next local day.
 
@@ -30,13 +30,47 @@ Report the unique legal on-time itinerary as flight IDs joined by hyphens. Nothi
 const EXPECTED = "A-C-L";
 
 const grade = (answer: string) => {
-    const line = answer.trim().split("\n").at(-1)?.trim() ?? "";
-    return line === EXPECTED;
-}
+    const stripped = answer.toUpperCase().replace(/[*_`~.,:;!?()[\]{}"'“”‘’]/g, "");
+    const token = EXPECTED.toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?<![A-Z0-9-])${token}(?![A-Z0-9-])`).test(stripped);
+};
 
-const effortSettings = ['low', 'medium', 'high'];
+const effortSettings = ['low', 'medium', 'high'] as const;
 
-const results = [];
+// Sonnet 5 list price. https://platform.claude.com/docs/en/about-claude/pricing
+const INPUT_USD_PER_MTOK = 2;
+const OUTPUT_USD_PER_MTOK = 10;
+
+const median = (xs: number[]) => {
+    const s = [...xs].sort((a, b) => a - b);
+    const mid = Math.floor(s.length / 2);
+    const a = s[mid];
+    const b = s[mid - 1];
+    if (a === undefined) return 0;
+    return s.length % 2 === 1 || b === undefined ? a : (a + b) / 2;
+};
+
+const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+const estimatedCostUsd = (inputTokens: number, outputTokens: number) =>
+    (inputTokens / 1e6) * INPUT_USD_PER_MTOK + (outputTokens / 1e6) * OUTPUT_USD_PER_MTOK;
+
+type Outcome = "correct" | "wrong" | "truncated";
+
+const outcomeOf = (answer: string, stop: string | null): Outcome => {
+    if (stop === "max_tokens") return "truncated";
+    return grade(answer) ? "correct" : "wrong";
+};
+
+const results: {
+    effort: (typeof effortSettings)[number];
+    outcome: Outcome;
+    latencyMs: number;
+    inputTokens: number;
+    outputTokens: number;
+    stop: string | null;
+    answer: string;
+}[] = [];
 
 for (const effort of effortSettings) {
     for (let i = 0; i < N; i++) {
@@ -50,17 +84,51 @@ for (const effort of effortSettings) {
               }
         });
         const answerText = answer.content.filter((block) => block.type === "text").map((block) => block.text).join("");
-        const endTime = performance.now();
-        const duration = endTime - startTime;
-        const result = {
+        const stop = answer.stop_reason;
+        results.push({
             effort,
+            outcome: outcomeOf(answerText, stop),
+            latencyMs: performance.now() - startTime,
+            inputTokens: answer.usage?.input_tokens ?? 0,
+            outputTokens: answer.usage?.output_tokens ?? 0,
+            stop,
             answer: answerText,
-            grade: grade(answerText),
-            duration,
-            tokens: answer.usage?.output_tokens ?? 0,
-            stop: answer.stop_reason,
-        };
-        results.push(result);
+        });
     }
 }
-console.table(results);
+
+const rows = effortSettings.map((effort) => {
+    const trials = results.filter((r) => r.effort === effort);
+    const correct = trials.filter((t) => t.outcome === "correct").length;
+    const inputTokens = trials.reduce((s, t) => s + t.inputTokens, 0);
+    const outputTokens = trials.reduce((s, t) => s + t.outputTokens, 0);
+    return {
+        effort,
+        accuracy: `${correct}/${N}`,
+        medianLatencyMs: Math.round(median(trials.map((t) => t.latencyMs))),
+        meanOutputTokens: Math.round(mean(trials.map((t) => t.outputTokens))),
+        estimatedCost: `$${estimatedCostUsd(inputTokens, outputTokens).toFixed(4)}`,
+    };
+});
+
+console.table(results.map((r) => ({
+    effort: r.effort,
+    outcome: r.outcome,
+    latencyMs: Math.round(r.latencyMs),
+    outputTokens: r.outputTokens,
+    stop: r.stop,
+    answer: r.answer,
+})));
+
+const failures = results
+    .filter((r) => r.outcome !== "correct")
+    .map((r) => ({
+        effort: r.effort,
+        stop: r.stop,
+        answerTail: r.answer.slice(-80),
+    }));
+if (failures.length > 0) {
+    console.table(failures);
+}
+
+console.table(rows);

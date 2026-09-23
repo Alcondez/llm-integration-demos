@@ -26,10 +26,10 @@ const question = 'How many days of PTO can I take by November 1st if I have work
   The company's vacation policy is as follows:
   ${source}
   `;
-const questionMessageWithSystemPrompt = `${systemMessage}\n\n${question}`;
 const answerWithDoc = await client.messages.create({
   model: MODEL,
-  messages: [{ role: 'user', content: questionMessageWithSystemPrompt }],
+  system: systemMessage,
+  messages: [{ role: 'user', content: question }],
   max_tokens: 1000,
 });
 for (const block of answerWithDoc.content) {

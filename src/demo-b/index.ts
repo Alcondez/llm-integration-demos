@@ -1,8 +1,3 @@
-// Demo B — "thinking budget"
-// Same multi-step task at low vs high effort, N >= 10 trials per setting.
-// Output: table of accuracy, latency, tokens/cost. A mini eval, not a gotcha.
-// Rule 2: effort buys odds, not guarantees.
-
 import { client, MODEL } from "../shared/client.js";
 
 const N = 30;

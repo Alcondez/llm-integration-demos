@@ -17,7 +17,7 @@ cp .env.example .env   # add your ANTHROPIC_API_KEY
 
 Niche fact from memory refuses; the same fact in context is answered from context.
 
-A modal without context can only recall information from it's training data, so if asked a question that required context that is not part of that it will refuse to answer, ask for more information or even worse, guess and give you a wrong answer with confidence. That is why we need to provide the model with the right context to get a better and more accurate answer.
+A model without context can only recall information from it's training data, so if asked a question that required context that is not part of that it will refuse to answer, ("I don't have access to your company's specific PTO policy, employee records, or HR system, so I can't give you an accurate answer to this question"), ask for more information or even worse, guess and give you a wrong answer with confidence. That is why we need to provide the model with the right context to get a better and more accurate answer, like "**10 + 3 = 13 business days of PTO** for the year."
 
 ### B — thinking budget
 
@@ -25,11 +25,11 @@ A modal without context can only recall information from it's training data, so 
 
 Low vs high effort over N runs: accuracy, latency, tokens.
 
-One of the knobs we can use when calling an LLM is the effort level, think of it as telling the model how hard it should try when working through a problem before giving up. One thing to keep in mind is that a higher effort does guarantee a correct answer, it just gives us better odds of getting one at the cost of more tokens used, so this is a crucial decision when integrating an LLM, since it heavily impacts how efficient our use of it is. 
+One of the knobs we can use when calling an LLM is the effort level, think of it as telling the model how hard it should try when working through a problem before giving up. One thing to keep in mind is that a higher effort does not guarantee a correct answer, it just gives us better odds of getting one and it also affects the latency and amount of tokens used by a call, so this is a crucial decision when integrating an LLM, since it heavily impacts how efficient our use of it is. 
 
 ## Demo B sample run
 
-N = 30 per effort, `claude-sonnet-5`. `estimatedCost` is the total for those 30 runs at today's Sonnet 5 list price: $2/MTok input, $10/MTok output.
+N = 30 per effort, `claude-sonnet-5`. `estimatedCost` is the total for those 30 runs at today's (Sept 23, 2026) Sonnet 5 list price: $2/MTok input, $10/MTok output.
 
 
 | effort | accuracy | medianLatencyMs | meanOutputTokens | estimatedCost |
